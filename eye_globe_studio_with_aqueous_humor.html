@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eye Globe Model Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" crossorigin="anonymous"></script>
+<style>
+  :root{
+    --bg:#EDEEF0;
+    --panel:#F7F8F9;
+    --panel-2:#EFF1F3;
+    --line:#D6DADE;
+    --accent:#0F5FA6;
+    --accent-dark:#0B4A82;
+    --accent-bg:#DCEBF8;
+    --text:#20262C;
+    --muted:#6B7480;
+    --muted-2:#98A0A9;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:'Inter',sans-serif; overflow:hidden;}
+  .app{display:flex; flex-direction:column; height:100vh;}
+
+  .titlebar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 22px; border-bottom:1px solid var(--line);
+    background:var(--panel); flex-shrink:0;
+  }
+  .brand{display:flex; align-items:baseline; gap:12px;}
+  .brand h1{font-weight:700; font-size:17px; letter-spacing:0.01em; margin:0; color:var(--text);}
+  .brand .eyebrow{
+    font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:0.1em;
+    color:var(--accent-dark); text-transform:uppercase; border:1px solid var(--accent);
+    background:var(--accent-bg); padding:3px 7px; border-radius:3px;
+  }
+  .titlebar .meta{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--muted-2);}
+
+  .main{ flex:1; display:flex; min-height:0; }
+  .sidebar{
+    width:370px; flex-shrink:0; background:var(--panel);
+    border-right:1px solid var(--line); overflow-y:auto;
+    display:flex; flex-direction:column;
+  }
+  .viewer{ flex:1; position:relative; background:
+      radial-gradient(circle at 30% 20%, #F5F6F7 0%, #E2E5E8 75%); }
+  #canvas-host{ position:absolute; inset:0; }
+
+  .note{
+    margin:14px 16px 0; padding:10px 12px; background:var(--accent-bg);
+    border:1px solid var(--accent); border-radius:6px; font-size:11.5px;
+    color:var(--accent-dark); line-height:1.5;
+  }
+
+  .section-label{
+    font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:0.1em;
+    color:var(--muted); text-transform:uppercase; margin:20px 0 10px 2px;
+  }
+  .params{ padding:0 16px 6px; }
+  .param-row{ margin-bottom:14px; }
+  .param-row .top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
+  .param-row label{ font-size:12.5px; color:var(--text); font-weight:500;}
+  .param-row .val{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--accent-dark);
+    background:var(--accent-bg); border:1px solid var(--accent);
+    padding:1px 7px; border-radius:3px; min-width:52px; text-align:center;
+  }
+  input[type=range]{
+    -webkit-appearance:none; width:100%; height:3px; background:var(--line);
+    border-radius:2px; outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+    background:var(--accent); cursor:pointer; border:2px solid #fff;
+    box-shadow:0 0 0 1px var(--accent);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:12px; height:12px; border-radius:50%; background:var(--accent);
+    border:2px solid #fff; cursor:pointer;
+  }
+
+  .derived{
+    margin:6px 16px 4px; padding:12px; background:#fff; border:1px solid var(--line);
+    border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:11.3px; color:var(--muted);
+  }
+  .derived div{ display:flex; justify-content:space-between; padding:3px 0; gap:10px;}
+  .derived span.v{ color:var(--accent-dark); font-weight:600; text-align:right;}
+
+  .footer{ padding:16px; border-top:1px solid var(--line); }
+  .btn{
+    width:100%; padding:11px; border-radius:6px; border:1px solid transparent;
+    font-weight:600; font-size:12.5px; cursor:pointer; letter-spacing:0.01em;
+    transition:opacity .15s, transform .1s; margin-bottom:8px;
+  }
+  .btn:active{ transform:scale(0.98); }
+  .btn-primary{ background:var(--accent); color:#fff; }
+  .btn-primary:hover{ background:var(--accent-dark); }
+  .btn-secondary{ background:#fff; border-color:var(--accent); color:var(--accent-dark); }
+  .btn-secondary:hover{ background:var(--accent-bg); }
+  .btn-ghost{ background:#fff; border-color:var(--line); color:var(--muted); margin-bottom:0;}
+  .btn-ghost:hover{ color:var(--text); border-color:var(--muted-2); }
+
+  .viewer-tag{
+    position:absolute; top:16px; left:18px; font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:var(--muted); letter-spacing:0.03em; pointer-events:none;
+    background:rgba(255,255,255,0.75); padding:3px 8px; border-radius:3px;
+  }
+  .viewer-tag b{ color:var(--text); font-weight:600; }
+  .viewer-hint{
+    position:absolute; bottom:14px; left:18px; font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--muted); pointer-events:none;
+    background:rgba(255,255,255,0.75); padding:2px 7px; border-radius:3px;
+  }
+  .legend{
+    position:absolute; top:16px; right:18px; font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--muted); pointer-events:none; text-align:right;
+    background:rgba(255,255,255,0.75); padding:6px 10px; border-radius:5px; line-height:1.7;
+  }
+  .legend .row{ display:flex; align-items:center; justify-content:flex-end; gap:6px;}
+  .legend .sw{ width:9px; height:9px; border-radius:2px; display:inline-block; }
+  .scale-badge{
+    position:absolute; bottom:14px; right:18px; font-family:'JetBrains Mono',monospace;
+    font-size:10.5px; color:var(--muted); text-align:right; pointer-events:none;
+    background:rgba(255,255,255,0.75); padding:2px 7px; border-radius:3px;
+  }
+  .scale-badge b{ color:var(--accent-dark); }
+  .toast{
+    position:absolute; top:64px; right:18px; background:#fff;
+    border:1px solid var(--accent); color:var(--accent-dark);
+    font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:8px 12px;
+    border-radius:5px; opacity:0; transform:translateY(-6px);
+    transition:opacity .2s, transform .2s; pointer-events:none;
+    box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  }
+  .toast.show{ opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="titlebar">
+    <div class="brand">
+      <h1>Eye Globe Model Studio</h1>
+      <span class="eyebrow">Cornea · Limbus · Sclera · Schlemm's Canal — STL for COMSOL</span>
+    </div>
+    <div class="meta">SCALE 1 UNIT = 1 mm</div>
+  </div>
+
+  <div class="main">
+    <div class="sidebar">
+      <div class="note">
+        Simplified axisymmetric anterior-segment shell (not patient-specific). Cornea/limbus are
+        modeled here as the Yeoh-material region and sclera as the Neo-Hookean region, matching
+        the material split used in the FEA methodology. Aqueous humor is modeled as a filled fluid
+        volume bounded by the inner cornea surface and an independent iris/lens boundary, closed at
+        the anterior chamber angle. Units are millimeters, same as the microstent geometry tool, so
+        parts line up directly.
+      </div>
+
+      <p class="section-label">01 · Globe &amp; cornea</p>
+      <div class="params" id="grp-globe"></div>
+
+      <p class="section-label">02 · Limbus</p>
+      <div class="params" id="grp-limbus"></div>
+
+      <p class="section-label">03 · Sclera</p>
+      <div class="params" id="grp-sclera"></div>
+
+      <p class="section-label">04 · Schlemm's canal</p>
+      <div class="params" id="grp-canal"></div>
+
+      <p class="section-label">05 · Aqueous humor (anterior chamber)</p>
+      <div class="params" id="grp-aqueous"></div>
+
+      <p class="section-label">06 · Stent insertion anchor</p>
+      <div class="params" id="grp-anchor"></div>
+
+      <div class="derived" id="derivedBox"></div>
+
+      <div class="footer">
+        <button class="btn btn-primary" id="exportEyeBtn">Download eye globe STL</button>
+        <button class="btn btn-secondary" id="exportCanalBtn">Download Schlemm's canal STL</button>
+        <button class="btn btn-secondary" id="exportAqueousBtn">Download aqueous humor STL</button>
+        <button class="btn btn-secondary" id="exportAnchorBtn">Download insertion guide STL</button>
+        <button class="btn btn-ghost" id="resetBtn">Reset to defaults</button>
+      </div>
+    </div>
+
+    <div class="viewer">
+      <div id="canvas-host"></div>
+      <div class="viewer-tag">EDITING&nbsp; <b>ANTERIOR EYE GLOBE</b></div>
+      <div class="viewer-hint">DRAG TO ORBIT · SCROLL TO ZOOM</div>
+      <div class="legend">
+        <div class="row"><span>cornea</span><span class="sw" style="background:#8FD4E8"></span></div>
+        <div class="row"><span>limbus</span><span class="sw" style="background:#E8B463"></span></div>
+        <div class="row"><span>sclera</span><span class="sw" style="background:#EDEAE1"></span></div>
+        <div class="row"><span>canal / anchor</span><span class="sw" style="background:#C4433B"></span></div>
+        <div class="row"><span>aqueous humor</span><span class="sw" style="background:#5FC6EE"></span></div>
+      </div>
+      <div class="scale-badge">UNITS <b>mm</b></div>
+      <div class="toast" id="toast">STL exported</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   SCENE SETUP (same pattern as the microstent tool, for consistency)
+   ============================================================ */
+const host = document.getElementById('canvas-host');
+const scene = new THREE.Scene();
+scene.background = null;
+
+const camera = new THREE.PerspectiveCamera(42, host.clientWidth/host.clientHeight, 0.01, 200);
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(host.clientWidth, host.clientHeight);
+host.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+const key = new THREE.DirectionalLight(0xffffff, 0.9);
+key.position.set(10, 14, 8);
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x9fd0ff, 0.35);
+rim.position.set(-8, -4, -10);
+scene.add(rim);
+
+const grid = new THREE.GridHelper(40, 40, 0xC3C9CE, 0xDDE1E4);
+grid.position.y = -16;
+scene.add(grid);
+
+const eyeMaterial = new THREE.MeshStandardMaterial({
+  vertexColors:true, metalness:0.05, roughness:0.55, side: THREE.DoubleSide,
+  transparent:true, opacity:0.93
+});
+const canalMaterial = new THREE.MeshStandardMaterial({ color:0xC4433B, metalness:0.2, roughness:0.4, side:THREE.DoubleSide });
+const anchorMaterial = new THREE.MeshStandardMaterial({ color:0xC4433B, metalness:0.3, roughness:0.3, side:THREE.DoubleSide });
+const aqueousMaterial = new THREE.MeshStandardMaterial({
+  color:0x5FC6EE, metalness:0.0, roughness:0.15, side:THREE.DoubleSide,
+  transparent:true, opacity:0.38, depthWrite:false
+});
+
+let eyeMesh = new THREE.Mesh(new THREE.BufferGeometry(), eyeMaterial);
+let canalMesh = new THREE.Mesh(new THREE.BufferGeometry(), canalMaterial);
+let anchorMesh = new THREE.Mesh(new THREE.BufferGeometry(), anchorMaterial);
+let aqueousMesh = new THREE.Mesh(new THREE.BufferGeometry(), aqueousMaterial);
+scene.add(eyeMesh, canalMesh, anchorMesh, aqueousMesh);
+
+let isDragging=false, prevX=0, prevY=0, azimuth=0.8, polar=1.15, radius=42;
+const target = new THREE.Vector3(0,0,0);
+function updateCam(){
+  const p = Math.max(0.15, Math.min(Math.PI-0.15, polar));
+  camera.position.set(
+    target.x + radius*Math.sin(p)*Math.sin(azimuth),
+    target.y + radius*Math.cos(p),
+    target.z + radius*Math.sin(p)*Math.cos(azimuth)
+  );
+  camera.lookAt(target);
+}
+updateCam();
+renderer.domElement.addEventListener('pointerdown', e=>{ isDragging=true; prevX=e.clientX; prevY=e.clientY; });
+window.addEventListener('pointerup', ()=> isDragging=false);
+window.addEventListener('pointermove', e=>{
+  if(!isDragging) return;
+  const dx = e.clientX-prevX, dy = e.clientY-prevY;
+  prevX=e.clientX; prevY=e.clientY;
+  azimuth -= dx*0.006;
+  polar   -= dy*0.006;
+  updateCam();
+});
+renderer.domElement.addEventListener('wheel', e=>{
+  e.preventDefault();
+  radius = Math.max(2, Math.min(120, radius + e.deltaY*0.02));
+  updateCam();
+}, { passive:false });
+window.addEventListener('resize', ()=>{
+  camera.aspect = host.clientWidth/host.clientHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(host.clientWidth, host.clientHeight);
+});
+(function animate(){ requestAnimationFrame(animate); renderer.render(scene, camera); })();
+
+/* ============================================================
+   MATH HELPERS
+   ============================================================ */
+function clamp(x,a,b){ return Math.max(a,Math.min(b,x)); }
+function smoothstep(x){ x=clamp(x,0,1); return x*x*(3-2*x); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function deg2rad(d){ return d*Math.PI/180; }
+
+// Piecewise-smooth interpolation across a sorted, non-decreasing control-point
+// list. Values before the first point or after the last point clamp flat.
+function piecewiseSmooth(pts, x){
+  if(x<=pts[0].t) return pts[0].v;
+  for(let k=0;k<pts.length-1;k++){
+    if(x<=pts[k+1].t){
+      const span = pts[k+1].t - pts[k].t;
+      const local = span>1e-9 ? (x-pts[k].t)/span : 1;
+      return lerp(pts[k].v, pts[k+1].v, smoothstep(local));
+    }
+  }
+  return pts[pts.length-1].v;
+}
+
+/* ============================================================
+   PARAMETER DEFINITIONS
+   ============================================================ */
+const DEFAULTS = {
+  scleraRadius: 11.75, corneaRadius: 7.80, corneaThickness: 0.54,
+  limbusAngleDeg: 30.0, limbusWidthDeg: 7, limbusThickness: 0.53,
+  equatorAngleDeg: 90, scleraThicknessEquator: 0.40, scleraThicknessPosterior: 0.95,
+  canalOffsetDeg: 1.5, canalTubeDiameter: 0.20, canalDepthFraction: 0.5,
+  chamberAngleDeg: 26, anteriorChamberDepth: 3.00, irisLensRadius: 10.0,
+  anchorClockDeg: 90, insertionDepth: 2.0
+};
+let v = JSON.parse(JSON.stringify(DEFAULTS));
+
+const PARAM_GROUPS = {
+  'grp-globe': [
+    {key:'scleraRadius', label:'Sclera radius (globe)', min:9, max:14, step:0.05, unit:'mm'},
+    {key:'corneaRadius', label:'Corneal radius of curvature', min:6.5, max:9.5, step:0.05, unit:'mm'},
+    {key:'corneaThickness', label:'Corneal apex thickness', min:0.35, max:0.80, step:0.01, unit:'mm'},
+  ],
+  'grp-limbus': [
+    {key:'limbusAngleDeg', label:'Limbus angle (from corneal apex)', min:25, max:55, step:0.5, unit:'\u00b0'},
+    {key:'limbusWidthDeg', label:'Limbus transition width', min:1, max:10, step:0.25, unit:'\u00b0'},
+    {key:'limbusThickness', label:'Limbus thickness', min:0.40, max:1.00, step:0.01, unit:'mm'},
+  ],
+  'grp-sclera': [
+    {key:'equatorAngleDeg', label:'Equator latitude', min:75, max:105, step:1, unit:'\u00b0'},
+    {key:'scleraThicknessEquator', label:'Scleral thickness (equator)', min:0.30, max:0.90, step:0.01, unit:'mm'},
+    {key:'scleraThicknessPosterior', label:'Scleral thickness (posterior pole)', min:0.60, max:1.60, step:0.01, unit:'mm'},
+  ],
+  'grp-canal': [
+    {key:'canalOffsetDeg', label:'Canal offset past limbus', min:0, max:10, step:0.25, unit:'\u00b0'},
+    {key:'canalTubeDiameter', label:'Canal tube diameter', min:0.15, max:0.50, step:0.01, unit:'mm'},
+    {key:'canalDepthFraction', label:'Canal depth in wall (0=outer,1=inner)', min:0, max:1, step:0.05, unit:''},
+  ],
+  'grp-aqueous': [
+    {key:'chamberAngleDeg', label:'Chamber angle (iris root, from apex)', min:10, max:50, step:0.5, unit:'\u00b0'},
+    {key:'anteriorChamberDepth', label:'Anterior chamber depth (center)', min:1.0, max:5.0, step:0.05, unit:'mm'},
+    {key:'irisLensRadius', label:'Iris/lens surface radius', min:4, max:40, step:0.5, unit:'mm'},
+  ],
+  'grp-anchor': [
+    {key:'anchorClockDeg', label:'Insertion position (around limbus)', min:0, max:360, step:1, unit:'\u00b0'},
+    {key:'insertionDepth', label:'Insertion depth into canal', min:0.5, max:4.0, step:0.05, unit:'mm'},
+  ],
+};
+
+function decimalsFor(step){ const s=step.toString(); const i=s.indexOf('.'); return i===-1?0:s.length-i-1; }
+
+function renderParams(){
+  Object.entries(PARAM_GROUPS).forEach(([containerId, plist])=>{
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    plist.forEach(p=>{
+      const dec = decimalsFor(p.step);
+      const row = document.createElement('div');
+      row.className = 'param-row';
+      row.innerHTML = `
+        <div class="top">
+          <label>${p.label}</label>
+          <span class="val" id="val-${p.key}">${v[p.key].toFixed(dec)}${p.unit?(' '+p.unit):''}</span>
+        </div>
+        <input type="range" id="in-${p.key}" min="${p.min}" max="${p.max}" step="${p.step}" value="${v[p.key]}">
+      `;
+      container.appendChild(row);
+      const input = row.querySelector('input');
+      input.addEventListener('input', ()=>{
+        v[p.key] = parseFloat(input.value);
+        document.getElementById(`val-${p.key}`).textContent = `${v[p.key].toFixed(dec)}${p.unit?(' '+p.unit):''}`;
+        regenerate();
+      });
+    });
+  });
+}
+
+/* ============================================================
+   GEOMETRY — axisymmetric shell of revolution.
+   theta = polar angle from the corneal apex (0) to the posterior
+   pole (pi). phi = angle around the optical axis (0..2pi).
+   ============================================================ */
+const CORNEA_COLOR = {r:0.56, g:0.83, b:0.91};
+const LIMBUS_COLOR = {r:0.91, g:0.70, b:0.39};
+const SCLERA_COLOR = {r:0.93, g:0.92, b:0.88};
+
+function getControlThetas(){
+  const thetaLimbus = deg2rad(v.limbusAngleDeg);
+  const halfW = deg2rad(v.limbusWidthDeg/2);
+  const p0 = 0;
+  const p1 = Math.max(p0, thetaLimbus - halfW);
+  const p2 = Math.max(p1, thetaLimbus);
+  const p3 = Math.max(p2, thetaLimbus + halfW);
+  const p4 = Math.max(p3, deg2rad(v.equatorAngleDeg));
+  const p5 = Math.max(p4, Math.PI);
+  return {p0,p1,p2,p3,p4,p5, thetaLimbus};
+}
+
+// The cornea and sclera are two DIFFERENT spheres, not one sphere with a
+// size change. Real corneas have a tighter radius of curvature than the
+// sclera, but their apex still pokes forward past the limbus. Using a
+// single shared center and just shrinking the radius (the old approach)
+// makes the smaller sphere sit *inside* the bigger one instead — that is
+// what produced the caved-in "hole" look. Here the cornea gets its own
+// center, shifted forward along the axis, solved so the two spheres meet
+// exactly at the limbus ring with no gap or overlap.
+function geomContext(){
+  const C = getControlThetas();
+  const a = v.scleraRadius*Math.sin(C.thetaLimbus);       // limbus ring radius (xy)
+  const b = v.scleraRadius*Math.cos(C.thetaLimbus);       // limbus ring height (z)
+  // Guard: the corneal sphere must be at least as large as the limbus ring
+  // it has to span, or no such sphere exists. If a slider combination asks
+  // for something geometrically impossible, widen it just enough to stay
+  // valid instead of producing NaN.
+  const RcEff = Math.max(v.corneaRadius, a + 0.02);
+  const zc = b - Math.sqrt(Math.max(1e-6, RcEff*RcEff - a*a)); // cornea sphere center (on axis)
+  const thetaLprime = Math.asin(clamp(a/RcEff, -1, 1));         // limbus angle on the cornea's own sphere
+  return { C, a, b, RcEff, zc, thetaLprime };
+}
+// Outer surface point at a given meridian angle theta (0=apex, pi=posterior
+// pole) and azimuth phi. theta < limbus uses the forward-shifted corneal
+// sphere; theta >= limbus uses the plain scleral sphere centered at origin.
+function outerPointAt(theta, phi, G){
+  const cx=Math.cos(phi), sy=Math.sin(phi);
+  if(theta < G.C.thetaLimbus){
+    const thetaLocal = G.C.thetaLimbus>1e-6 ? theta*(G.thetaLprime/G.C.thetaLimbus) : 0;
+    const r=G.RcEff, sinT=Math.sin(thetaLocal), cosT=Math.cos(thetaLocal);
+    return new THREE.Vector3(r*sinT*cx, r*sinT*sy, G.zc + r*cosT);
+  }
+  const r=v.scleraRadius, sinT=Math.sin(theta), cosT=Math.cos(theta);
+  return new THREE.Vector3(r*sinT*cx, r*sinT*sy, r*cosT);
+}
+function outerNormalAt(theta, phi, G){
+  const p = outerPointAt(theta, phi, G);
+  if(theta < G.C.thetaLimbus) return p.clone().sub(new THREE.Vector3(0,0,G.zc)).normalize();
+  return p.clone().normalize();
+}
+function thicknessAt(theta, C){
+  const pts = [
+    {t:C.p0, v:v.corneaThickness},
+    {t:C.p1, v:v.corneaThickness},
+    {t:C.p2, v:v.limbusThickness},
+    {t:C.p3, v:(v.limbusThickness+v.scleraThicknessEquator)/2},
+    {t:C.p4, v:v.scleraThicknessEquator},
+    {t:C.p5, v:v.scleraThicknessPosterior},
+  ];
+  return piecewiseSmooth(pts, theta);
+}
+function colorAt(theta, C){
+  function ch(name){
+    const pts = [
+      {t:C.p0, v:CORNEA_COLOR[name]},
+      {t:C.p1, v:CORNEA_COLOR[name]},
+      {t:C.p2, v:LIMBUS_COLOR[name]},
+      {t:C.p3, v:SCLERA_COLOR[name]},
+      {t:C.p5, v:SCLERA_COLOR[name]},
+    ];
+    return piecewiseSmooth(pts, theta);
+  }
+  return {r:ch('r'), g:ch('g'), b:ch('b')};
+}
+
+function buildEyeShell(){
+  const G = geomContext();
+  const C = G.C;
+  const latSeg = 140, lonSeg = 96, thetaEps = 0.02;
+  const thetaMin = thetaEps, thetaMax = Math.PI - thetaEps;
+
+  const outerRows=[], innerRows=[], rowColors=[];
+  for(let i=0;i<=latSeg;i++){
+    const theta = thetaMin + (thetaMax-thetaMin)*(i/latSeg);
+    const oRow=[], iRow=[];
+    for(let j=0;j<=lonSeg;j++){
+      const phi = (j/lonSeg)*Math.PI*2;
+      const outerPt = outerPointAt(theta, phi, G);
+      const normal = outerNormalAt(theta, phi, G);
+      const rOApprox = outerPt.length();
+      const th = clamp(thicknessAt(theta, C), 0.02, Math.max(0.03, rOApprox*0.9));
+      const innerPt = outerPt.clone().sub(normal.multiplyScalar(th));
+      oRow.push(outerPt); iRow.push(innerPt);
+    }
+    outerRows.push(oRow); innerRows.push(iRow);
+    rowColors.push(colorAt(theta, C));
+  }
+
+  const pos=[], col=[];
+  function tri(a,b,c, ca,cb,cc){
+    pos.push(a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z);
+    col.push(ca.r,ca.g,ca.b, cb.r,cb.g,cb.b, cc.r,cc.g,cc.b);
+  }
+  for(let i=0;i<latSeg;i++){
+    const c1=rowColors[i], c2=rowColors[i+1];
+    for(let j=0;j<lonSeg;j++){
+      const a=outerRows[i][j], b=outerRows[i+1][j], c=outerRows[i+1][j+1], d=outerRows[i][j+1];
+      tri(a,b,c, c1,c2,c2); tri(a,c,d, c1,c2,c1);
+      const A=innerRows[i][j], B=innerRows[i+1][j], Cc=innerRows[i+1][j+1], D=innerRows[i][j+1];
+      tri(A,Cc,B, c1,c2,c2); tri(A,D,Cc, c1,c1,c2);
+    }
+  }
+  // Cap both poles: stitch outer ring to inner ring so the shell is watertight.
+  for(let j=0;j<lonSeg;j++){
+    const c0=rowColors[0];
+    const oA=outerRows[0][j], oB=outerRows[0][j+1], iA=innerRows[0][j], iB=innerRows[0][j+1];
+    tri(oA, iA, iB, c0,c0,c0); tri(oA, iB, oB, c0,c0,c0);
+    const cN=rowColors[latSeg];
+    const oA2=outerRows[latSeg][j], oB2=outerRows[latSeg][j+1], iA2=innerRows[latSeg][j], iB2=innerRows[latSeg][j+1];
+    tri(oA2, oB2, iB2, cN,cN,cN); tri(oA2, iB2, iA2, cN,cN,cN);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col,3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ============================================================
+   AQUEOUS HUMOR — filled solid occupying the anterior chamber.
+   Bounded in front by the inner (endothelial) cornea surface, and
+   behind by an iris/lens boundary surface — a second, independent
+   spherical cap whose apex sits `anteriorChamberDepth` behind the
+   corneal endothelium's central point. The two caps don't have to
+   land on the same radius at their edge, so a short rim wall
+   stitches them together at the chamber angle to keep the solid
+   watertight, regardless of the exact curvature chosen.
+   ============================================================ */
+function innerCorneaPointAt(theta, phi, G){
+  const outerPt = outerPointAt(theta, phi, G);
+  const normal = outerNormalAt(theta, phi, G);
+  const th = thicknessAt(theta, G.C);
+  return outerPt.clone().sub(normal.clone().multiplyScalar(th));
+}
+function aqueousGeomContext(G){
+  // Keep the chamber angle strictly inside the limbus — the front
+  // boundary is only valid on the corneal sphere.
+  const thetaChamber = clamp(deg2rad(v.chamberAngleDeg), 0.05, Math.max(0.06, G.C.thetaLimbus-0.01));
+  const z0 = innerCorneaPointAt(0, 0, G).z;                 // endothelial apex (chamber front, on-axis)
+  const rimFront = innerCorneaPointAt(thetaChamber, 0, G);
+  const aRim = Math.hypot(rimFront.x, rimFront.y);          // chamber-angle rim radius
+  const zIrisApex = z0 - v.anteriorChamberDepth;            // iris/lens apex (chamber back, on-axis)
+  const R = Math.max(aRim + 0.02, v.irisLensRadius);        // sphere must be big enough to reach the rim
+  const zC2 = zIrisApex - R;
+  const thetaLocalEdge = Math.asin(clamp(aRim/R, -1, 1));
+  return { thetaChamber, z0, aRim, zIrisApex, R, zC2, thetaLocalEdge };
+}
+function irisLensPointAt(theta, phi, AG){
+  const thetaLocal = AG.thetaChamber>1e-6 ? theta*(AG.thetaLocalEdge/AG.thetaChamber) : 0;
+  const cx=Math.cos(phi), sy=Math.sin(phi);
+  const sinT=Math.sin(thetaLocal), cosT=Math.cos(thetaLocal);
+  return new THREE.Vector3(AG.R*sinT*cx, AG.R*sinT*sy, AG.zC2 + AG.R*cosT);
+}
+function buildAqueousHumor(){
+  const G = geomContext();
+  const AG = aqueousGeomContext(G);
+  const latSeg2 = 48, lonSeg2 = 72;
+  const frontRows=[], backRows=[];
+  for(let i=0;i<=latSeg2;i++){
+    const theta = AG.thetaChamber*(i/latSeg2);
+    const fRow=[], bRow=[];
+    for(let j=0;j<=lonSeg2;j++){
+      const phi = (j/lonSeg2)*Math.PI*2;
+      fRow.push(innerCorneaPointAt(theta, phi, G));
+      bRow.push(irisLensPointAt(theta, phi, AG));
+    }
+    frontRows.push(fRow); backRows.push(bRow);
+  }
+  const pos=[];
+  function tri(a,b,c){ pos.push(a.x,a.y,a.z, b.x,b.y,b.z, c.x,c.y,c.z); }
+  for(let i=0;i<latSeg2;i++){
+    for(let j=0;j<lonSeg2;j++){
+      const a=frontRows[i][j], b=frontRows[i+1][j], c=frontRows[i+1][j+1], d=frontRows[i][j+1];
+      tri(a,b,c); tri(a,c,d);
+      const A=backRows[i][j], B=backRows[i+1][j], C=backRows[i+1][j+1], D=backRows[i][j+1];
+      tri(A,C,B); tri(A,D,C); // reversed winding so front/back caps face opposite ways
+    }
+  }
+  // Rim wall closing the gap between the front cap's edge and the back
+  // cap's edge at the chamber angle, so the solid is watertight even
+  // when the two curvatures don't meet at exactly the same height.
+  for(let j=0;j<lonSeg2;j++){
+    const fa=frontRows[latSeg2][j], fb=frontRows[latSeg2][j+1];
+    const ba=backRows[latSeg2][j], bb=backRows[latSeg2][j+1];
+    tri(fa, fb, bb); tri(fa, bb, ba);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+function canalGeometryInfo(){
+  const G = geomContext();
+  const thetaCanal = G.C.thetaLimbus + deg2rad(v.canalOffsetDeg);
+  const outerPt = outerPointAt(thetaCanal, 0, G);
+  const normal = outerNormalAt(thetaCanal, 0, G);
+  const th = thicknessAt(thetaCanal, G.C);
+  const wallPt = outerPt.clone().sub(normal.multiplyScalar(v.canalDepthFraction*th));
+  const xyRadius = Math.hypot(wallPt.x, wallPt.y);
+  return { thetaCanal, xyRadius, z: wallPt.z, tubeRadius: v.canalTubeDiameter/2 };
+}
+
+function buildCanalMesh(){
+  const info = canalGeometryInfo();
+  const geo = new THREE.TorusGeometry(Math.max(0.05,info.xyRadius), Math.max(0.02,info.tubeRadius), 16, 120);
+  geo.translate(0,0,info.z);
+  return geo.index ? geo.toNonIndexed() : geo;
+}
+
+function anchorInfo(){
+  const G = geomContext();
+  const info = canalGeometryInfo();
+  const theta = info.thetaCanal;
+  const phi = deg2rad(v.anchorClockDeg);
+  const entry = outerPointAt(theta, phi, G);
+  const normal = outerNormalAt(theta, phi, G);
+  const tip = entry.clone().sub(normal.clone().multiplyScalar(v.insertionDepth));
+  return { entry, tip, axis: normal.clone().multiplyScalar(-1) };
+}
+
+function buildAnchorMesh(){
+  const { entry, tip } = anchorInfo();
+  const sphere = new THREE.SphereGeometry(0.18, 16, 16);
+  sphere.translate(entry.x, entry.y, entry.z);
+  const dir = new THREE.Vector3().subVectors(tip, entry);
+  const len = Math.max(0.01, dir.length());
+  const cyl = new THREE.CylinderGeometry(0.06, 0.06, len, 16);
+  const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), dir.clone().normalize());
+  const rotMat = new THREE.Matrix4().makeRotationFromQuaternion(q);
+  cyl.applyMatrix4(rotMat);
+  const mid = entry.clone().add(tip).multiplyScalar(0.5);
+  cyl.translate(mid.x, mid.y, mid.z);
+
+  const sPos = (sphere.index ? sphere.toNonIndexed() : sphere).attributes.position.array;
+  const cPos = (cyl.index ? cyl.toNonIndexed() : cyl).attributes.position.array;
+  const merged = new Float32Array(sPos.length + cPos.length);
+  merged.set(sPos, 0);
+  merged.set(cPos, sPos.length);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(merged, 3));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/* ============================================================
+   DERIVED READOUT
+   ============================================================ */
+function updateDerived(){
+  const G = geomContext();
+  const info = canalGeometryInfo();
+  const anchor = anchorInfo();
+  const AG = aqueousGeomContext(G);
+  const corneaChord = 2*G.a; // actual limbus ring diameter where cornea meets sclera
+  const apexProtrusion = (G.zc + G.RcEff) - v.scleraRadius; // how far the corneal apex pokes past the bare sclera pole
+  const limbusWidthMm = v.corneaRadius*deg2rad(v.limbusWidthDeg);
+  const canalDiam = 2*info.xyRadius;
+  const canalCirc = 2*Math.PI*info.xyRadius;
+  let clockHour = Math.round((v.anchorClockDeg/360)*12);
+  if(clockHour===0) clockHour=12;
+  const fmt3 = (x)=>x.toFixed(3);
+  const rows = {
+    'Globe diameter': (2*v.scleraRadius).toFixed(2)+' mm',
+    'Corneal diameter (chord)': corneaChord.toFixed(2)+' mm',
+    'Corneal apex protrusion': apexProtrusion.toFixed(3)+' mm',
+    'Limbus band width': limbusWidthMm.toFixed(2)+' mm',
+    'Canal mean diameter': canalDiam.toFixed(2)+' mm',
+    'Canal circumference': canalCirc.toFixed(2)+' mm',
+    'Chamber angle': (AG.thetaChamber*180/Math.PI).toFixed(1)+' deg',
+    'Chamber depth (center)': v.anteriorChamberDepth.toFixed(2)+' mm',
+    'Chamber rim diameter': (2*AG.aRim).toFixed(2)+' mm',
+    'Insertion clock position': '~'+clockHour+' o\'clock',
+    'Entry point (mm)': `${fmt3(anchor.entry.x)}, ${fmt3(anchor.entry.y)}, ${fmt3(anchor.entry.z)}`,
+    'Tip point (mm)': `${fmt3(anchor.tip.x)}, ${fmt3(anchor.tip.y)}, ${fmt3(anchor.tip.z)}`,
+    'Insertion axis (unit vec)': `${fmt3(anchor.axis.x)}, ${fmt3(anchor.axis.y)}, ${fmt3(anchor.axis.z)}`,
+  };
+  document.getElementById('derivedBox').innerHTML = Object.entries(rows).map(([k,val])=>
+    `<div><span>${k}</span><span class="v">${val}</span></div>`).join('');
+}
+
+/* ============================================================
+   REGENERATE / CAMERA FIT
+   ============================================================ */
+function fitCamera(){
+  radius = Math.max(20, v.scleraRadius*3.2);
+  updateCam();
+}
+function regenerate(){
+  try{
+    const newEye = buildEyeShell();
+    const newCanal = buildCanalMesh();
+    const newAnchor = buildAnchorMesh();
+    const newAqueous = buildAqueousHumor();
+    eyeMesh.geometry.dispose(); eyeMesh.geometry = newEye;
+    canalMesh.geometry.dispose(); canalMesh.geometry = newCanal;
+    anchorMesh.geometry.dispose(); anchorMesh.geometry = newAnchor;
+    aqueousMesh.geometry.dispose(); aqueousMesh.geometry = newAqueous;
+    updateDerived();
+  }catch(err){
+    console.error('Eye model build failed for current parameters:', err);
+    showToast('That combination is invalid — adjusting');
+  }
+}
+
+renderParams();
+regenerate();
+fitCamera();
+
+/* ============================================================
+   STL EXPORT
+   ============================================================ */
+function meshToASCIISTL(geometry, name){
+  const pos = geometry.attributes.position;
+  const lines = [`solid ${name}`];
+  const vA=new THREE.Vector3(), vB=new THREE.Vector3(), vC=new THREE.Vector3();
+  const e1=new THREE.Vector3(), e2=new THREE.Vector3(), n=new THREE.Vector3();
+  for(let i=0;i<pos.count;i+=3){
+    vA.fromBufferAttribute(pos, i);
+    vB.fromBufferAttribute(pos, i+1);
+    vC.fromBufferAttribute(pos, i+2);
+    e1.subVectors(vB, vA);
+    e2.subVectors(vC, vA);
+    n.crossVectors(e1, e2).normalize();
+    lines.push(`facet normal ${n.x.toExponential(6)} ${n.y.toExponential(6)} ${n.z.toExponential(6)}`);
+    lines.push(' outer loop');
+    [vA,vB,vC].forEach(p => lines.push(`  vertex ${p.x.toExponential(6)} ${p.y.toExponential(6)} ${p.z.toExponential(6)}`));
+    lines.push(' endloop');
+    lines.push('endfacet');
+  }
+  lines.push(`endsolid ${name}`);
+  return lines.join('\n');
+}
+function downloadSTL(geometry, filename, solidName){
+  const stl = meshToASCIISTL(geometry, solidName);
+  const blob = new Blob([stl], { type:'model/stl' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(showToast._h);
+  showToast._h = setTimeout(()=> t.classList.remove('show'), 1900);
+}
+
+document.getElementById('exportEyeBtn').addEventListener('click', ()=>{
+  downloadSTL(eyeMesh.geometry, 'eye_globe_cornea_limbus_sclera.stl', 'eye_globe');
+  showToast('Eye globe STL exported \u2713');
+});
+document.getElementById('exportCanalBtn').addEventListener('click', ()=>{
+  downloadSTL(canalMesh.geometry, 'schlemms_canal.stl', 'schlemms_canal');
+  showToast('Canal STL exported \u2713');
+});
+document.getElementById('exportAqueousBtn').addEventListener('click', ()=>{
+  downloadSTL(aqueousMesh.geometry, 'aqueous_humor.stl', 'aqueous_humor');
+  showToast('Aqueous humor STL exported \u2713');
+});
+document.getElementById('exportAnchorBtn').addEventListener('click', ()=>{
+  downloadSTL(anchorMesh.geometry, 'stent_insertion_guide.stl', 'insertion_guide');
+  showToast('Insertion guide exported \u2713');
+});
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  v = JSON.parse(JSON.stringify(DEFAULTS));
+  renderParams();
+  regenerate();
+  fitCamera();
+  showToast('Reset to defaults');
+});
+</script>
+</body>
+</html>
